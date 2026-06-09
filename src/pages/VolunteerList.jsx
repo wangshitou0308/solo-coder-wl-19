@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function VolunteerList() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [directionFilter, setDirectionFilter] = useState('all');
@@ -41,8 +41,9 @@ export default function VolunteerList() {
   const stats = {
     total: state.volunteers.length,
     active: state.volunteers.filter(v => v.status === 'active').length,
+    pending: state.volunteers.filter(v => v.status === 'pending').length,
     totalTasks: state.volunteers.reduce((acc, v) => acc + v.tasksCompleted, 0),
-    avgRating: (state.volunteers.reduce((acc, v) => acc + v.rating, 0) / state.volunteers.length).toFixed(1),
+    avgRating: (state.volunteers.filter(v => v.status === 'active').reduce((acc, v) => acc + v.rating, 0) / Math.max(1, state.volunteers.filter(v => v.status === 'active').length)).toFixed(1),
   };
 
   const openTasks = state.tasks.filter(t => t.status === 'open').length;
@@ -67,8 +68,8 @@ export default function VolunteerList() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard icon={Users} label="注册志愿者" value={stats.total} color="blue" />
         <StatCard icon={UserCheck} label="活跃志愿者" value={stats.active} color="green" />
+        <StatCard icon={ClipboardList} label="待资质审核" value={stats.pending} color="warm" />
         <StatCard icon={ClipboardList} label="累计完成任务" value={stats.totalTasks} color="purple" />
-        <StatCard icon={Star} label="平均服务评分" value={stats.avgRating} color="warm" suffix="★" />
       </div>
 
       <div className="card !p-4">
@@ -83,6 +84,7 @@ export default function VolunteerList() {
           </select>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input-field w-32">
             <option value="all">全部状态</option>
+            <option value="pending">待审核</option>
             <option value="active">活跃</option>
             <option value="inactive">非活跃</option>
           </select>
@@ -92,25 +94,30 @@ export default function VolunteerList() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(v => {
           const tasksThisMonth = Math.round(v.tasksCompleted * 0.15);
+          const isPending = v.status === 'pending';
           return (
-            <div key={v.id} className="card !p-0 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-              <div className="h-2 bg-gradient-to-r from-primary-400 to-primary-600" />
+            <div key={v.id} className={`card !p-0 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer ${isPending ? 'ring-2 ring-warm-200' : ''}`}>
+              <div className={`h-2 ${isPending ? 'bg-gradient-to-r from-warm-400 to-warm-600' : 'bg-gradient-to-r from-primary-400 to-primary-600'}`} />
               <div className="p-5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                    <div className={`w-14 h-14 ${isPending ? 'bg-gradient-to-br from-warm-400 to-warm-600' : 'bg-gradient-to-br from-primary-400 to-primary-600'} rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
                       {v.name.slice(0, 1)}
                     </div>
                     <div>
                       <div className="font-semibold text-lg text-gray-800">{v.name}</div>
                       <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
                         <Award className="w-3 h-3" />
-                        自 {v.joinDate} 加入
+                        {isPending ? '提交申请：' : '自 '}{v.joinDate}{isPending ? '' : ' 加入'}
                       </div>
                     </div>
                   </div>
-                  <span className={`status-badge ${v.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {v.status === 'active' ? '活跃' : '非活跃'}
+                  <span className={`status-badge ${
+                    isPending ? 'bg-warm-100 text-warm-700' :
+                    v.status === 'active' ? 'bg-green-100 text-green-700' :
+                    'bg-gray-100 text-gray-500'
+                  }`}>
+                    {isPending ? '待审核' : v.status === 'active' ? '活跃' : '非活跃'}
                   </span>
                 </div>
 
@@ -145,22 +152,45 @@ export default function VolunteerList() {
                   </div>
                 )}
 
-                <div className="mt-5 pt-4 border-t border-gray-100 grid grid-cols-3 gap-3 text-center">
-                  <div>
-                    <div className="text-lg font-bold text-gray-800">{v.tasksCompleted}</div>
-                    <div className="text-xs text-gray-500">累计任务</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-primary-600">{tasksThisMonth}</div>
-                    <div className="text-xs text-gray-500">本月任务</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-warm-600 flex items-center justify-center gap-0.5">
-                      {v.rating} <Star className="w-3.5 h-3.5 fill-current" />
+                {isPending ? (
+                  <div className="mt-5 pt-4 border-t border-warm-100 space-y-2">
+                    <div className="p-3 bg-warm-50 rounded-lg text-xs text-warm-700">
+                      等待管理员资质审核通过后，志愿者即可开始认领任务
                     </div>
-                    <div className="text-xs text-gray-500">服务评分</div>
+                    <div className="flex gap-2">
+                      <button className="btn-secondary !py-1.5 !px-3 text-sm flex-1 text-red-600 !bg-red-50 !border-red-100" onClick={(e) => {
+                        e.stopPropagation();
+                        if (!confirm('确认拒绝该志愿者申请？拒绝后该志愿者将无法认领任务')) return;
+                        dispatch({ type: 'UPDATE_VOLUNTEER', payload: { id: v.id, data: { status: 'inactive' } } });
+                      }}>拒绝</button>
+                      <button className="btn-primary !py-1.5 !px-3 text-sm flex-1 flex items-center justify-center gap-1" onClick={(e) => {
+                        e.stopPropagation();
+                        if (!confirm(`确认审核通过志愿者 ${v.name}？通过后即可开始认领平台任务`)) return;
+                        dispatch({ type: 'APPROVE_VOLUNTEER', payload: { volunteerId: v.id } });
+                        dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'task', message: `志愿者${v.name}资质审核已通过` } });
+                      }}>
+                        <UserCheck className="w-3.5 h-3.5" /> 审核通过
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="mt-5 pt-4 border-t border-gray-100 grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <div className="text-lg font-bold text-gray-800">{v.tasksCompleted}</div>
+                      <div className="text-xs text-gray-500">累计任务</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-primary-600">{tasksThisMonth}</div>
+                      <div className="text-xs text-gray-500">本月任务</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-warm-600 flex items-center justify-center gap-0.5">
+                        {v.rating} <Star className="w-3.5 h-3.5 fill-current" />
+                      </div>
+                      <div className="text-xs text-gray-500">服务评分</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );

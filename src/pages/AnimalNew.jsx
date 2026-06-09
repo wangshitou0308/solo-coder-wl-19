@@ -7,6 +7,8 @@ import {
   Save,
   Upload,
   Image as ImageIcon,
+  Building2,
+  CheckCircle,
 } from 'lucide-react';
 
 const samplePhotos = [
@@ -21,7 +23,7 @@ const samplePhotos = [
 ];
 
 export default function AnimalNew() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, generateId } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const clueId = searchParams.get('clueId');
@@ -65,16 +67,20 @@ export default function AnimalNew() {
       alert('请填写名字和品种');
       return;
     }
-    dispatch({ type: 'ADD_ANIMAL', payload: { ...form, weight: parseFloat(form.weight) || 0, ageEstimate: parseFloat(form.ageEstimate) || 0 } });
+    const newAnimalId = generateId('A');
+    dispatch({ type: 'ADD_ANIMAL', payload: { ...form, id: newAnimalId, weight: parseFloat(form.weight) || 0, ageEstimate: parseFloat(form.ageEstimate) || 0 } });
 
     if (clueId) {
-      dispatch({ type: 'UPDATE_CLUE_STATUS', payload: { clueId, status: 'rescued' } });
+      dispatch({ type: 'UPDATE_CLUE_STATUS', payload: { clueId, status: 'rescued', animalId: newAnimalId } });
     }
 
     dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'clue', message: `动物${form.name}档案已创建` } });
     alert('档案创建成功！');
     navigate('/animals');
   };
+
+  const stationName = state.stations.find(s => s.id === form.stationId)?.name || '';
+  const clueStationName = state.stations.find(s => s.id === clue?.assignedStationId)?.name || '';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -87,6 +93,17 @@ export default function AnimalNew() {
           <p className="text-sm text-gray-500 mt-1">{clueId ? `基于线索 #${clueId} 创建` : '录入新收容的流浪动物信息'}</p>
         </div>
       </div>
+
+      {clueId && clueStationName && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
+          <Building2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-800 flex-1">
+            <div className="font-semibold mb-0.5">线索处理机构已自动关联</div>
+            <div>所属救助站：<b>{clueStationName}</b>（来源：线索 #{clueId} 自动就近分配）</div>
+          </div>
+          <CheckCircle className="w-5 h-5 text-blue-600" />
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Photo Section */}

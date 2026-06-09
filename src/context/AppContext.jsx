@@ -74,13 +74,20 @@ function reducer(state, action) {
   switch (action.type) {
     case 'ADD_CLUE': {
       const { lat, lng } = action.payload;
-      const { station } = findNearestStation(lat, lng, state.stations);
+      const hasCoords = typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+      let status = 'pending';
+      let assignedStationId = null;
+      if (hasCoords) {
+        const { station } = findNearestStation(lat, lng, state.stations);
+        status = 'assigned';
+        assignedStationId = station.id;
+      }
       const newClue = {
         id: generateId('C'),
         ...action.payload,
         reportTime: new Date().toLocaleString('zh-CN'),
-        status: 'assigned',
-        assignedStationId: station.id,
+        status,
+        assignedStationId,
         animalId: null,
       };
       return {
@@ -101,11 +108,11 @@ function reducer(state, action) {
 
     case 'ADD_ANIMAL': {
       const newAnimal = {
-        id: generateId('A'),
+        id: action.payload.id || generateId('A'),
         ...action.payload,
-        vaccinations: [],
-        dewormings: [],
-        treatments: [],
+        vaccinations: action.payload.vaccinations || [],
+        dewormings: action.payload.dewormings || [],
+        treatments: action.payload.treatments || [],
       };
       return {
         ...state,
@@ -280,7 +287,7 @@ function reducer(state, action) {
       const newVolunteer = {
         id: generateId('V'),
         ...action.payload,
-        status: 'active',
+        status: 'pending',
         joinDate: new Date().toISOString().split('T')[0],
         tasksCompleted: 0,
         rating: 0,
@@ -288,6 +295,26 @@ function reducer(state, action) {
       return {
         ...state,
         volunteers: [...state.volunteers, newVolunteer],
+      };
+    }
+
+    case 'APPROVE_VOLUNTEER': {
+      const { volunteerId } = action.payload;
+      return {
+        ...state,
+        volunteers: state.volunteers.map(v =>
+          v.id === volunteerId ? { ...v, status: 'active' } : v
+        ),
+      };
+    }
+
+    case 'UPDATE_VOLUNTEER': {
+      const { id, data } = action.payload;
+      return {
+        ...state,
+        volunteers: state.volunteers.map(v =>
+          v.id === id ? { ...v, ...data } : v
+        ),
       };
     }
 

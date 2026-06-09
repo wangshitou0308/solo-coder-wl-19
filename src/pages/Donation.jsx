@@ -35,6 +35,7 @@ export default function Donation() {
   const [showDonateModal, setShowDonateModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [donationSearch, setDonationSearch] = useState('');
 
   const [donateForm, setDonateForm] = useState({
     donorName: '', type: 'money', amount: '', itemName: '', quantity: '', unit: '', purpose: '',
@@ -57,8 +58,18 @@ export default function Donation() {
   const balance = totalDonations - totalExpenses;
 
   const filteredDonations = useMemo(() => {
-    return state.donations.filter(d => filter === 'all' || d.type === filter);
-  }, [state.donations, filter]);
+    return state.donations.filter(d => {
+      if (filter !== 'all' && d.type !== filter) return false;
+      if (donationSearch) {
+        const s = donationSearch.toLowerCase();
+        const donor = (d.donorName || '').toLowerCase();
+        const purpose = (d.purpose || '').toLowerCase();
+        const item = (d.itemName || '').toLowerCase();
+        if (!donor.includes(s) && !purpose.includes(s) && !item.includes(s)) return false;
+      }
+      return true;
+    });
+  }, [state.donations, filter, donationSearch]);
 
   // 月度收支数据
   const monthlyData = useMemo(() => {
@@ -307,7 +318,12 @@ export default function Donation() {
                 </select>
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input className="input-field pl-10" placeholder="搜索捐赠人、用途..." />
+                  <input
+                    className="input-field pl-10"
+                    placeholder="搜索捐赠人、用途、物资名称..."
+                    value={donationSearch}
+                    onChange={(e) => setDonationSearch(e.target.value)}
+                  />
                 </div>
               </div>
 

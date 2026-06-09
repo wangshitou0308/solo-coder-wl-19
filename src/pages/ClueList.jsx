@@ -184,9 +184,22 @@ export default function ClueList() {
                   </div>
 
                   {clue.assignedStationId && (
-                    <div className="mt-3 flex items-center gap-2 text-sm text-blue-700">
-                      <Building2 className="w-4 h-4" />
-                      <span>处理机构：<b>{getStationName(clue.assignedStationId)}</b></span>
+                    <div className="mt-3 p-2.5 bg-blue-50 rounded-lg border border-blue-100 flex items-center gap-2 text-sm">
+                      <Building2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-xs text-blue-500">处理机构</span>
+                        <div className="font-semibold text-blue-800">{getStationName(clue.assignedStationId)}</div>
+                      </div>
+                      <CheckCircle className="w-4 h-4 text-blue-500" />
+                    </div>
+                  )}
+
+                  {clue.status === 'pending' && (
+                    <div className="mt-3 p-2.5 bg-warm-50 rounded-lg border border-warm-100 flex items-center gap-2 text-sm">
+                      <AlertCircle className="w-4 h-4 text-warm-600 flex-shrink-0" />
+                      <div className="text-xs text-warm-700">
+                        暂未分配救助站，请点击下方分配按钮或等待管理员人工处理
+                      </div>
                     </div>
                   )}
 
