@@ -9,10 +9,15 @@ import {
   TrendingUp,
   Activity,
   Syringe,
+  Pill,
+  Stethoscope,
+  Scissors,
   Clock,
   AlertTriangle,
+  AlertCircle,
   ChevronRight,
 } from 'lucide-react';
+import { healthEventTypes } from '../data/mockData';
 import {
   BarChart,
   Bar,
@@ -178,8 +183,43 @@ export default function Dashboard() {
     return arr;
   }, [state, selectedStation]);
 
+  const upcomingHealthEvents = useMemo(() => {
+    const today = new Date('2026-06-10');
+    const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const animals = selectedStation === 'all'
+      ? state.animals
+      : state.animals.filter(a => a.stationId === selectedStation);
+    const events = [];
+    animals.forEach(animal => {
+      (animal.healthEvents || []).forEach(event => {
+        if (!event.nextDate) return;
+        const next = new Date(event.nextDate);
+        if (next <= in30Days) {
+          events.push({
+            ...event,
+            animalId: animal.id,
+            animalName: animal.name,
+            animalPhoto: animal.photo,
+            daysLeft: Math.ceil((next - today) / (24 * 60 * 60 * 1000)),
+            isOverdue: next < today,
+          });
+        }
+      });
+    });
+    return events.sort((a, b) => a.daysLeft - b.daysLeft);
+  }, [state, selectedStation]);
+
   const recentAdoptions = state.adoptions.slice(0, 5);
   const recentClues = state.clues.slice(0, 5);
+
+  const iconMap = { Syringe, Pill, Scissors, Stethoscope, Activity };
+  const colorMap = {
+    primary: { bg: 'bg-primary-50', border: 'border-primary-200', text: 'text-primary-600' },
+    blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600' },
+    pink: { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-600' },
+    indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-600' },
+    red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600' },
+  };
 
   const PIE_COLORS = ['#22c55e', '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#6366f1', '#6b7280'];
 
@@ -315,6 +355,63 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      {/* Health Events Reminder */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary-500" /> 健康事项到期提醒
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">未来30天内到期的疫苗、体检、驱虫等事项</p>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span className="flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 text-red-500" /> 已超期 {upcomingHealthEvents.filter(e => e.isOverdue).length}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-warm-500" /> 即将到期 {upcomingHealthEvents.filter(e => !e.isOverdue).length}
+            </span>
+          </div>
+        </div>
+        {upcomingHealthEvents.length === 0 ? (
+          <div className="p-8 bg-green-50 rounded-xl text-center">
+            <Syringe className="w-10 h-10 text-green-400 mx-auto" />
+            <div className="text-green-700 font-medium mt-2">暂无即将到期的健康事项</div>
+            <div className="text-xs text-green-600 mt-1">所有动物健康状况良好</div>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-[320px] overflow-y-auto">
+            {upcomingHealthEvents.map((event) => {
+              const cfg = healthEventTypes.find(t => t.key === event.type) || healthEventTypes[0];
+              const Icon = iconMap[cfg.icon] || Activity;
+              const cm = colorMap[cfg.color] || colorMap.primary;
+              return (
+                <div
+                  key={`${event.animalId}-${event.id}`}
+                  className={`${cm.bg} ${cm.border} border rounded-xl p-3 flex items-center gap-3 hover:shadow-sm transition-shadow cursor-pointer`}
+                  onClick={() => navigate(`/animals/${event.animalId}`)}
+                >
+                  <img src={event.animalPhoto} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                  <div className={`w-9 h-9 ${cm.bg} ${cm.border} border rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <Icon className={`w-4.5 h-4.5 ${cm.text}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-800 truncate">{event.animalName}</span>
+                      <span className={`status-badge ${event.isOverdue ? 'bg-red-100 text-red-700' : 'bg-warm-100 text-warm-700'} text-xs`}>
+                        {event.isOverdue ? `已超期 ${Math.abs(event.daysLeft)} 天` : `还剩 ${event.daysLeft} 天`}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5 truncate">{event.name} · 到期日 {event.nextDate}</div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Health Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

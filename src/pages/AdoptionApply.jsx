@@ -92,6 +92,28 @@ export default function AdoptionApply() {
     );
   }
 
+  if (animal.status !== 'adoptable') {
+    const statusLabel = {
+      sheltering: '收容中', treating: '治疗中', recovering: '康复中',
+      adopted: '已领养', followup: '回访期', archived: '已归档'
+    }[animal.status] || animal.status;
+    return (
+      <div className="space-y-4">
+        <button className="flex items-center gap-2 text-gray-600 hover:text-gray-800" onClick={() => navigate('/animals')}>
+          <ChevronLeft className="w-5 h-5" /> 返回动物列表
+        </button>
+        <div className="card text-center py-16">
+          <AlertCircle className="w-16 h-16 text-warm-400 mx-auto" />
+          <div className="text-gray-800 font-medium mt-4">该动物当前不可申请领养</div>
+          <div className="text-gray-500 mt-2 text-sm">
+            当前状态：<b>{statusLabel}</b>，仅"待领养"状态的动物可发起领养申请
+          </div>
+          <button className="btn-primary mt-6" onClick={() => navigate('/animals')}>查看可领养动物</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">

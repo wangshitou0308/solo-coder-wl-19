@@ -15,10 +15,13 @@ import {
   Building2,
   AlertCircle,
   X,
+  Truck,
+  ClipboardList,
+  Save,
 } from 'lucide-react';
 
 export default function ClueList() {
-  const { state, dispatch, findNearestStation } = useApp();
+  const { state, dispatch, findNearestStation, filtered: roleFiltered } = useApp();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -26,6 +29,8 @@ export default function ClueList() {
   const [selectedClue, setSelectedClue] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignStationId, setAssignStationId] = useState('');
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', deadline: '', reward: 50 });
 
   const getStatusInfo = (status) => {
     const map = {
@@ -36,7 +41,9 @@ export default function ClueList() {
     return map[status] || { label: status, color: 'bg-gray-100 text-gray-700', icon: Clock };
   };
 
-  const filtered = state.clues.filter(c => {
+  const visibleClues = roleFiltered.clues;
+
+  const filtered = visibleClues.filter(c => {
     if (statusFilter !== 'all' && c.status !== statusFilter) return false;
     if (speciesFilter !== 'all' && c.species !== speciesFilter) return false;
     if (search) {
@@ -81,11 +88,50 @@ export default function ClueList() {
     navigate(`/animals/new?clueId=${clue.id}`);
   };
 
+  const handleCreateTask = (clue) => {
+    setSelectedClue(clue);
+    setTaskForm({
+      title: `${clue.location}救援任务`,
+      description: `前往${clue.location}救援${clue.species}类动物。体貌特征：${clue.features}。健康观察：${clue.healthObserve}`,
+      deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+      reward: 50,
+    });
+    setShowTaskModal(true);
+  };
+
+  const confirmCreateTask = () => {
+    if (!selectedClue || !taskForm.title || !taskForm.description || !taskForm.deadline) {
+      alert('请填写完整的任务信息');
+      return;
+    }
+    dispatch({
+      type: 'CREATE_TASK_FROM_CLUE',
+      payload: {
+        clueId: selectedClue.id,
+        title: taskForm.title,
+        description: taskForm.description,
+        deadline: taskForm.deadline,
+        reward: taskForm.reward,
+      },
+    });
+    dispatch({
+      type: 'ADD_NOTIFICATION',
+      payload: { type: 'task', message: `救援任务已发布：${taskForm.title}` },
+    });
+    setShowTaskModal(false);
+    setSelectedClue(null);
+    alert('救援任务已发布至任务中心！');
+  };
+
+  const getRelatedTask = (clueId) => {
+    return state.tasks.find(t => t.clueId === clueId);
+  };
+
   const stats = {
-    total: state.clues.length,
-    pending: state.clues.filter(c => c.status === 'pending').length,
-    assigned: state.clues.filter(c => c.status === 'assigned').length,
-    rescued: state.clues.filter(c => c.status === 'rescued').length,
+    total: visibleClues.length,
+    pending: visibleClues.filter(c => c.status === 'pending').length,
+    assigned: visibleClues.filter(c => c.status === 'assigned').length,
+    rescued: visibleClues.filter(c => c.status === 'rescued').length,
   };
 
   return (
@@ -203,15 +249,36 @@ export default function ClueList() {
                     </div>
                   )}
 
-                  <div className="mt-4 flex items-center gap-2">
+                  {getRelatedTask(clue.id) && (
+                    <div className="mt-3 p-2.5 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center gap-2 text-sm">
+                      <ClipboardList className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-xs text-indigo-500">关联救援任务</span>
+                        <div className="font-semibold text-indigo-800 truncate">{getRelatedTask(clue.id)?.title}</div>
+                      </div>
+                      <button className="text-xs text-indigo-600 hover:underline" onClick={(e) => { e.stopPropagation(); navigate('/tasks'); }}>查看</button>
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex items-center gap-2 flex-wrap">
                     {clue.status === 'pending' && (
                       <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={(e) => { e.stopPropagation(); handleAssign(clue); }}>
                         <Send className="w-3.5 h-3.5" /> 分配救助站
                       </button>
                     )}
+                    {clue.status !== 'rescued' && !getRelatedTask(clue.id) && clue.assignedStationId && (
+                      <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={(e) => { e.stopPropagation(); handleCreateTask(clue); }}>
+                        <Truck className="w-3.5 h-3.5" /> 生成救援任务
+                      </button>
+                    )}
                     {clue.status === 'assigned' && !clue.animalId && (
                       <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={(e) => { e.stopPropagation(); handleCreateAnimal(clue); }}>
                         <PawPrint className="w-3.5 h-3.5" /> 建立档案
+                      </button>
+                    )}
+                    {getRelatedTask(clue.id)?.status === 'completed' && !clue.animalId && (
+                      <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={(e) => { e.stopPropagation(); handleCreateAnimal(clue); }}>
+                        <PawPrint className="w-3.5 h-3.5" /> 救援完成，建立档案
                       </button>
                     )}
                     {clue.animalId && (
@@ -259,6 +326,50 @@ export default function ClueList() {
             <div className="p-4 border-t border-gray-100 flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => { setShowAssignModal(false); setSelectedClue(null); }}>取消</button>
               <button className="btn-primary" onClick={confirmAssign} disabled={!assignStationId}>确认分配</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Task Modal */}
+      {showTaskModal && selectedClue && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setShowTaskModal(false); setSelectedClue(null); }}>
+          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Truck className="w-5 h-5 text-primary-500" /> 生成救援任务
+              </h3>
+              <button className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={() => { setShowTaskModal(false); setSelectedClue(null); }}><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700 space-y-1">
+                <div><b>线索位置：</b>{selectedClue.location}</div>
+                <div><b>动物类型：</b>{selectedClue.species}类</div>
+                <div><b>体貌特征：</b>{selectedClue.features}</div>
+                <div><b>发现位置：</b>{selectedClue.location}</div>
+              </div>
+              <div>
+                <label className="label-field">任务标题 <span className="text-red-500">*</span></label>
+                <input className="input-field" value={taskForm.title} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} placeholder="如：海淀区五道口救援运输" />
+              </div>
+              <div>
+                <label className="label-field">任务描述 <span className="text-red-500">*</span></label>
+                <textarea className="input-field min-h-[80px]" value={taskForm.description} onChange={e => setTaskForm(p => ({ ...p, description: e.target.value }))} placeholder="详细描述任务内容和要求..." />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label-field">截止时间 <span className="text-red-500">*</span></label>
+                  <input type="datetime-local" className="input-field" value={taskForm.deadline} onChange={e => setTaskForm(p => ({ ...p, deadline: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="label-field">补贴金额（元）</label>
+                  <input type="number" className="input-field" value={taskForm.reward} onChange={e => setTaskForm(p => ({ ...p, reward: e.target.value }))} placeholder="0 表示公益志愿" />
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-100 flex justify-end gap-2 flex-shrink-0">
+              <button className="btn-secondary" onClick={() => { setShowTaskModal(false); setSelectedClue(null); }}>取消</button>
+              <button className="btn-primary flex items-center gap-1" onClick={confirmCreateTask}><Save className="w-4 h-4" /> 发布任务</button>
             </div>
           </div>
         </div>

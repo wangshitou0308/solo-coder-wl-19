@@ -9,6 +9,7 @@ import {
   initialExpenses,
   rescueStations,
   followupSchedule,
+  defaultUser,
 } from '../data/mockData';
 
 const AppContext = createContext();
@@ -22,13 +23,7 @@ const initialState = {
   donations: initialDonations,
   expenses: initialExpenses,
   stations: rescueStations,
-  currentUser: {
-    id: 'admin001',
-    name: '系统管理员',
-    role: 'admin',
-    stationId: null,
-    avatar: null,
-  },
+  currentUser: defaultUser,
   notifications: [
     { id: 'N001', type: 'clue', message: '收到新的救助线索：朝阳区国贸发现受伤流浪猫', time: '10分钟前', read: false },
     { id: 'N002', type: 'adoption', message: '领养申请AD003待审核', time: '25分钟前', read: false },
@@ -122,6 +117,10 @@ function reducer(state, action) {
 
     case 'UPDATE_ANIMAL': {
       const { id, data } = action.payload;
+      const animal = state.animals.find(a => a.id === id);
+      if (animal?.status === 'archived') {
+        return state;
+      }
       return {
         ...state,
         animals: state.animals.map(a => a.id === id ? { ...a, ...data } : a),
@@ -130,6 +129,10 @@ function reducer(state, action) {
 
     case 'CHANGE_ANIMAL_STATUS': {
       const { id, status } = action.payload;
+      const animal = state.animals.find(a => a.id === id);
+      if (animal?.status === 'archived') {
+        return state;
+      }
       return {
         ...state,
         animals: state.animals.map(a => a.id === id ? { ...a, status } : a),
@@ -138,6 +141,10 @@ function reducer(state, action) {
 
     case 'ADD_VACCINATION': {
       const { animalId, vaccination } = action.payload;
+      const animal = state.animals.find(a => a.id === animalId);
+      if (animal?.status === 'archived') {
+        return state;
+      }
       return {
         ...state,
         animals: state.animals.map(a =>
@@ -148,6 +155,10 @@ function reducer(state, action) {
 
     case 'ADD_DEWORMING': {
       const { animalId, deworming } = action.payload;
+      const animal = state.animals.find(a => a.id === animalId);
+      if (animal?.status === 'archived') {
+        return state;
+      }
       return {
         ...state,
         animals: state.animals.map(a =>
@@ -158,6 +169,10 @@ function reducer(state, action) {
 
     case 'ADD_TREATMENT': {
       const { animalId, treatment } = action.payload;
+      const animal = state.animals.find(a => a.id === animalId);
+      if (animal?.status === 'archived') {
+        return state;
+      }
       return {
         ...state,
         animals: state.animals.map(a =>
@@ -166,8 +181,45 @@ function reducer(state, action) {
       };
     }
 
+    case 'ADD_HEALTH_EVENT': {
+      const { animalId, event } = action.payload;
+      const animal = state.animals.find(a => a.id === animalId);
+      if (animal?.status === 'archived') {
+        return state;
+      }
+      const newEvent = {
+        id: generateId('H'),
+        ...event,
+      };
+      return {
+        ...state,
+        animals: state.animals.map(a =>
+          a.id === animalId
+            ? { ...a, healthEvents: [...(a.healthEvents || []), newEvent] }
+            : a
+        ),
+      };
+    }
+
+    case 'SET_STERILIZED': {
+      const { animalId, sterilized, date } = action.payload;
+      const animal = state.animals.find(a => a.id === animalId);
+      if (animal?.status === 'archived') {
+        return state;
+      }
+      return {
+        ...state,
+        animals: state.animals.map(a =>
+          a.id === animalId ? { ...a, sterilized } : a
+        ),
+      };
+    }
+
     case 'ADD_ADOPTION_APPLICATION': {
       const animal = state.animals.find(a => a.id === action.payload.animalId);
+      if (animal?.status !== 'adoptable') {
+        return state;
+      }
       const newAdoption = {
         id: generateId('AD'),
         ...action.payload,
@@ -334,6 +386,10 @@ function reducer(state, action) {
 
     case 'CLAIM_TASK': {
       const { taskId, volunteerId } = action.payload;
+      const task = state.tasks.find(t => t.id === taskId);
+      if (!task || task.status === 'completed' || task.status === 'claimed') {
+        return state;
+      }
       return {
         ...state,
         tasks: state.tasks.map(t =>
@@ -345,12 +401,47 @@ function reducer(state, action) {
     case 'COMPLETE_TASK': {
       const { taskId } = action.payload;
       const task = state.tasks.find(t => t.id === taskId);
+      let newClues = state.clues;
+      if (task?.clueId) {
+        newClues = state.clues.map(c =>
+          c.id === task.clueId ? { ...c, status: 'rescued' } : c
+        );
+      }
       return {
         ...state,
         tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'completed' } : t),
+        clues: newClues,
         volunteers: state.volunteers.map(v =>
           v.id === task?.claimantId ? { ...v, tasksCompleted: v.tasksCompleted + 1 } : v
         ),
+      };
+    }
+
+    case 'CREATE_TASK_FROM_CLUE': {
+      const { clueId, title, description, deadline, reward } = action.payload;
+      const clue = state.clues.find(c => c.id === clueId);
+      if (!clue) return state;
+      const newTask = {
+        id: generateId('T'),
+        title: title || `${clue.location}救援任务`,
+        type: '运输',
+        description: description || `前往${clue.location}救援${clue.species}类动物，体貌特征：${clue.features}`,
+        location: clue.location,
+        publishTime: new Date().toLocaleString('zh-CN'),
+        deadline: deadline || addDays(new Date().toISOString().split('T')[0], 1),
+        reward: reward || 50,
+        status: 'open',
+        claimantId: null,
+        stationId: clue.assignedStationId || state.stations[0]?.id,
+        clueId,
+      };
+      const updatedClues = state.clues.map(c =>
+        c.id === clueId ? { ...c, status: 'assigned' } : c
+      );
+      return {
+        ...state,
+        tasks: [newTask, ...state.tasks],
+        clues: updatedClues,
       };
     }
 
@@ -402,6 +493,35 @@ function reducer(state, action) {
       };
     }
 
+    case 'SET_USER_ROLE': {
+      const { role } = action.payload;
+      const roleNameMap = {
+        admin: '系统管理员',
+        staff: '救助站工作人员',
+        volunteer: '志愿者',
+        adopter: '领养人',
+      };
+      let stationId = null;
+      if (role === 'staff') stationId = 'S001';
+      return {
+        ...state,
+        currentUser: {
+          ...state.currentUser,
+          role,
+          name: roleNameMap[role] || state.currentUser.name,
+          stationId,
+        },
+      };
+    }
+
+    case 'SET_USER_STATION': {
+      const { stationId } = action.payload;
+      return {
+        ...state,
+        currentUser: { ...state.currentUser, stationId },
+      };
+    }
+
     default:
       return state;
   }
@@ -409,13 +529,78 @@ function reducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const user = state.currentUser;
+
+  const filtered = useMemo(() => {
+    const { role, stationId } = user;
+    const byStation = (list) => stationId ? list.filter(x => x.stationId === stationId) : list;
+    const byUserStation = (list) => {
+      if (role === 'admin') return list;
+      if (role === 'staff') return list.filter(x => x.stationId === stationId);
+      return [];
+    };
+    switch (role) {
+      case 'admin':
+        return {
+          animals: state.animals,
+          clues: state.clues,
+          adoptions: state.adoptions,
+          tasks: state.tasks,
+          volunteers: state.volunteers,
+          donations: state.donations,
+          expenses: state.expenses,
+          stations: state.stations,
+        };
+      case 'staff':
+        return {
+          animals: state.animals.filter(a => a.stationId === stationId),
+          clues: state.clues.filter(c => c.assignedStationId === stationId || !c.assignedStationId),
+          adoptions: state.adoptions.filter(a => {
+            const an = state.animals.find(x => x.id === a.animalId);
+            return an?.stationId === stationId;
+          }),
+          tasks: state.tasks.filter(t => t.stationId === stationId),
+          volunteers: state.volunteers,
+          donations: state.donations,
+          expenses: state.expenses,
+          stations: state.stations.filter(s => s.id === stationId),
+        };
+      case 'volunteer':
+        return {
+          animals: [],
+          clues: [],
+          adoptions: [],
+          tasks: state.tasks,
+          volunteers: [],
+          donations: [],
+          expenses: [],
+          stations: [],
+        };
+      case 'adopter':
+        return {
+          animals: [],
+          clues: [],
+          adoptions: state.adoptions.filter(a => a.applicantName === user.name || a.id === 'AD001'),
+          tasks: [],
+          volunteers: [],
+          donations: [],
+          expenses: [],
+          stations: [],
+        };
+      default:
+        return {
+          animals: [], clues: [], adoptions: [], tasks: [], volunteers: [], donations: [], expenses: [], stations: [],
+        };
+    }
+  }, [user, state]);
 
   const value = useMemo(() => ({
     state,
     dispatch,
+    filtered,
     findNearestStation: (lat, lng) => findNearestStation(lat, lng, state.stations),
     generateId,
-  }), [state]);
+  }), [state, filtered]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 
 export default function AnimalList() {
-  const { state } = useApp();
+  const { state, filtered } = useApp();
   const navigate = useNavigate();
+  const user = state.currentUser;
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [speciesFilter, setSpeciesFilter] = useState('all');
@@ -27,8 +28,10 @@ export default function AnimalList() {
 
   const getStatusInfo = (key) => animalStatuses.find(s => s.key === key) || { label: key, color: 'bg-gray-100 text-gray-600' };
 
-  const filtered = useMemo(() => {
-    return state.animals.filter(a => {
+  const visibleAnimals = filtered.animals;
+
+  const displayAnimals = useMemo(() => {
+    return visibleAnimals.filter(a => {
       if (statusFilter !== 'all' && a.status !== statusFilter) return false;
       if (speciesFilter !== 'all' && a.species !== speciesFilter) return false;
       if (stationFilter !== 'all' && a.stationId !== stationFilter) return false;
@@ -44,13 +47,13 @@ export default function AnimalList() {
       }
       return true;
     });
-  }, [state.animals, search, statusFilter, speciesFilter, stationFilter, genderFilter]);
+  }, [visibleAnimals, search, statusFilter, speciesFilter, stationFilter, genderFilter]);
 
   const stats = {
-    total: state.animals.length,
-    adoptable: state.animals.filter(a => a.status === 'adoptable').length,
-    treating: state.animals.filter(a => a.status === 'treating').length,
-    unsterilized: state.animals.filter(a => !a.sterilized && a.ageEstimate >= 0.8 && !['adopted', 'followup', 'archived'].includes(a.status)).length,
+    total: visibleAnimals.length,
+    adoptable: visibleAnimals.filter(a => a.status === 'adoptable').length,
+    treating: visibleAnimals.filter(a => a.status === 'treating').length,
+    unsterilized: visibleAnimals.filter(a => !a.sterilized && a.ageEstimate >= 0.8 && !['adopted', 'followup', 'archived'].includes(a.status)).length,
   };
 
   const getStationName = (id) => state.stations.find(s => s.id === id)?.name || '未知';
@@ -132,7 +135,7 @@ export default function AnimalList() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((a) => {
+        {displayAnimals.map((a) => {
           const st = getStatusInfo(a.status);
           return (
             <div key={a.id} className="card !p-0 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigate(`/animals/${a.id}`)}>
@@ -184,7 +187,7 @@ export default function AnimalList() {
         })}
       </div>
 
-      {filtered.length === 0 && (
+      {displayAnimals.length === 0 && (
         <div className="card text-center py-16">
           <PawPrint className="w-16 h-16 text-gray-300 mx-auto" />
           <div className="text-gray-500 mt-4">暂无符合条件的动物档案</div>

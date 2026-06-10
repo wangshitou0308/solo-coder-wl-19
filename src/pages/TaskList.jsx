@@ -17,6 +17,8 @@ import {
   CalendarRange,
   Filter,
   X,
+  PawPrint,
+  ArrowRight,
 } from 'lucide-react';
 
 const taskTypeConfig = {
@@ -28,19 +30,22 @@ const taskTypeConfig = {
 };
 
 export default function TaskList() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, filtered: roleFiltered } = useApp();
+  const user = state.currentUser;
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', type: '现场协助', description: '', location: '', deadline: '', reward: 0, stationId: state.stations[0]?.id || '' });
 
+  const visibleTasks = roleFiltered.tasks;
+
   const filtered = useMemo(() => {
-    return state.tasks.filter(t => {
+    return visibleTasks.filter(t => {
       if (statusFilter !== 'all' && t.status !== statusFilter) return false;
       if (typeFilter !== 'all' && t.type !== typeFilter) return false;
       return true;
     });
-  }, [state.tasks, statusFilter, typeFilter]);
+  }, [visibleTasks, statusFilter, typeFilter]);
 
   const getStatusInfo = (s) => {
     const map = {
@@ -53,14 +58,25 @@ export default function TaskList() {
 
   const getStationName = (id) => state.stations.find(s => s.id === id)?.name || '未知';
   const getVolunteerName = (id) => state.volunteers.find(v => v.id === id)?.name || '未指派';
+  const getClue = (clueId) => state.clues.find(c => c.id === clueId);
 
   const stats = {
-    open: state.tasks.filter(t => t.status === 'open').length,
-    claimed: state.tasks.filter(t => t.status === 'claimed').length,
-    completed: state.tasks.filter(t => t.status === 'completed').length,
+    open: visibleTasks.filter(t => t.status === 'open').length,
+    claimed: visibleTasks.filter(t => t.status === 'claimed').length,
+    completed: visibleTasks.filter(t => t.status === 'completed').length,
   };
 
   const handleClaim = (taskId) => {
+    const task = visibleTasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (task.status === 'completed') {
+      alert('该任务已完成，不可重复认领');
+      return;
+    }
+    if (task.status === 'claimed') {
+      alert('该任务已被其他志愿者认领');
+      return;
+    }
     if (!confirm('确认认领此任务？')) return;
     dispatch({ type: 'CLAIM_TASK', payload: { taskId, volunteerId: state.volunteers[0]?.id } });
     dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'task', message: '任务已认领' } });
@@ -194,10 +210,22 @@ export default function TaskList() {
                           <Gift className="w-3.5 h-3.5" /> {t.reward > 0 ? `补贴 ¥${t.reward}` : '公益志愿'}
                         </span>
                       </div>
+                      {t.clueId && getClue(t.clueId) && (
+                        <div className="mt-3 p-2.5 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center gap-2 text-sm">
+                          <MapPin className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs text-indigo-500">关联救助线索</span>
+                            <div className="font-semibold text-indigo-800 truncate">
+                              {getClue(t.clueId)?.features} · {getClue(t.clueId)?.location}
+                            </div>
+                          </div>
+                          <button className="text-xs text-indigo-600 hover:underline flex-shrink-0" onClick={() => navigate('/clues')}>查看线索</button>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
                       <div className="text-xs text-gray-400">发布于 {getStationName(t.stationId)}</div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap justify-end">
                         {t.status === 'open' && (
                           <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={() => handleClaim(t.id)}>
                             <UserCheck className="w-3.5 h-3.5" /> 认领任务
@@ -206,6 +234,16 @@ export default function TaskList() {
                         {t.status === 'claimed' && (
                           <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={() => handleComplete(t.id)}>
                             <Check className="w-3.5 h-3.5" /> 完成
+                          </button>
+                        )}
+                        {t.status === 'completed' && t.clueId && !getClue(t.clueId)?.animalId && (
+                          <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={() => navigate(`/animals/new?clueId=${t.clueId}&taskId=${t.id}`)}>
+                            <PawPrint className="w-3.5 h-3.5" /> 建立动物档案
+                          </button>
+                        )}
+                        {t.status === 'completed' && t.clueId && getClue(t.clueId)?.animalId && (
+                          <button className="btn-secondary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={() => navigate(`/animals/${getClue(t.clueId)?.animalId}`)}>
+                            查看档案 <ArrowRight className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>

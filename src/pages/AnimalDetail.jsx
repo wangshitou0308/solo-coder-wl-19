@@ -21,6 +21,7 @@ import {
   X,
   Check,
   AlertCircle,
+  Clock,
 } from 'lucide-react';
 
 export default function AnimalDetail() {
@@ -34,9 +35,12 @@ export default function AnimalDetail() {
   const [showVaccineModal, setShowVaccineModal] = useState(false);
   const [showDewormingModal, setShowDewormingModal] = useState(false);
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
+  const [showHealthEventModal, setShowHealthEventModal] = useState(false);
+  const [healthFilter, setHealthFilter] = useState('all');
   const [vaccineForm, setVaccineForm] = useState({ name: '', date: '', nextDate: '' });
   const [dewormingForm, setDewormingForm] = useState({ type: '体内', date: '' });
   const [treatmentForm, setTreatmentForm] = useState({ date: '', description: '', result: '' });
+  const [healthEventForm, setHealthEventForm] = useState({ type: 'vaccination', name: '', date: '', nextDate: '', notes: '' });
 
   const animal = state.animals.find(a => a.id === id);
   const getStatusInfo = (key) => animalStatuses.find(s => s.key === key) || { label: key, color: 'bg-gray-100 text-gray-600' };
@@ -62,6 +66,10 @@ export default function AnimalDetail() {
 
   const handleStatusChange = () => {
     if (!newStatus) return;
+    if (animal?.status === 'archived') {
+      alert('该动物档案已归档，无法变更状态');
+      return;
+    }
     dispatch({ type: 'CHANGE_ANIMAL_STATUS', payload: { id, status: newStatus } });
     dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'task', message: `动物${animal.name}状态已变更为${getStatusInfo(newStatus).label}` } });
     setShowStatusModal(false);
@@ -69,6 +77,10 @@ export default function AnimalDetail() {
   };
 
   const handleSaveVaccine = () => {
+    if (animal?.status === 'archived') {
+      alert('该动物档案已归档，无法添加记录');
+      return;
+    }
     if (!vaccineForm.name || !vaccineForm.date) { alert('请填写完整信息'); return; }
     dispatch({ type: 'ADD_VACCINATION', payload: { animalId: id, vaccination: vaccineForm } });
     setShowVaccineModal(false);
@@ -76,6 +88,10 @@ export default function AnimalDetail() {
   };
 
   const handleSaveDeworming = () => {
+    if (animal?.status === 'archived') {
+      alert('该动物档案已归档，无法添加记录');
+      return;
+    }
     if (!dewormingForm.date) { alert('请填写日期'); return; }
     dispatch({ type: 'ADD_DEWORMING', payload: { animalId: id, deworming: dewormingForm } });
     setShowDewormingModal(false);
@@ -83,21 +99,54 @@ export default function AnimalDetail() {
   };
 
   const handleSaveTreatment = () => {
+    if (animal?.status === 'archived') {
+      alert('该动物档案已归档，无法添加记录');
+      return;
+    }
     if (!treatmentForm.date || !treatmentForm.description) { alert('请填写完整信息'); return; }
     dispatch({ type: 'ADD_TREATMENT', payload: { animalId: id, treatment: treatmentForm } });
     setShowTreatmentModal(false);
     setTreatmentForm({ date: '', description: '', result: '' });
   };
 
-  const status = getStatusInfo(animal.status);
+  const handleSaveHealthEvent = () => {
+    if (animal?.status === 'archived') {
+      alert('该动物档案已归档，无法添加记录');
+      return;
+    }
+    if (!healthEventForm.name || !healthEventForm.date) { alert('请填写事件名称和日期'); return; }
+    dispatch({ type: 'ADD_HEALTH_EVENT', payload: { animalId: id, event: healthEventForm } });
+    if (healthEventForm.type === 'sterilization') {
+      dispatch({ type: 'SET_STERILIZED', payload: { animalId: id, sterilized: true } });
+    }
+    setShowHealthEventModal(false);
+    setHealthEventForm({ type: 'vaccination', name: '', date: '', nextDate: '', notes: '' });
+  };
 
-  const canAdopt = ['adoptable', 'recovering'].includes(animal.status);
+  const status = getStatusInfo(animal.status);
+  const isArchived = animal.status === 'archived';
+
+  const canAdopt = animal.status === 'adoptable';
 
   const tabs = [
     { key: 'basic', label: '基础档案', icon: FileText },
-    { key: 'health', label: '健康记录', icon: Activity },
+    { key: 'health', label: '健康事件', icon: Activity },
     { key: 'timeline', label: '状态流转', icon: ArrowRightLeft },
   ];
+
+  const healthEventConfig = {
+    vaccination: { label: '疫苗接种', icon: Syringe, color: 'primary' },
+    deworming: { label: '驱虫', icon: Pill, color: 'blue' },
+    sterilization: { label: '绝育手术', icon: Scissors, color: 'pink' },
+    checkup: { label: '体检', icon: Stethoscope, color: 'indigo' },
+    surgery: { label: '手术/治疗', icon: Activity, color: 'red' },
+  };
+
+  const allHealthEvents = useMemo(() => {
+    const events = currentAnimal.healthEvents || [];
+    if (healthFilter === 'all') return events;
+    return events.filter(e => e.type === healthFilter);
+  }, [currentAnimal.healthEvents, healthFilter]);
 
   const currentAnimal = state.animals.find(a => a.id === id);
   const display = editMode ? form : currentAnimal;
@@ -118,16 +167,25 @@ export default function AnimalDetail() {
             <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> 入站：{currentAnimal.rescueDate}</span>
           </p>
         </div>
-        <button className="btn-secondary flex items-center gap-2" onClick={() => setEditMode(!editMode)}>
-          {editMode ? <><Check className="w-4 h-4" /> 完成</> : <><Edit className="w-4 h-4" /> 编辑</>}
-        </button>
-        <button className="btn-secondary flex items-center gap-2" onClick={() => setShowStatusModal(true)}>
-          <ArrowRightLeft className="w-4 h-4" /> 变更状态
-        </button>
-        {canAdopt && (
+        {!isArchived && (
+          <button className="btn-secondary flex items-center gap-2" onClick={() => setEditMode(!editMode)}>
+            {editMode ? <><Check className="w-4 h-4" /> 完成</> : <><Edit className="w-4 h-4" /> 编辑</>}
+          </button>
+        )}
+        {!isArchived && (
+          <button className="btn-secondary flex items-center gap-2" onClick={() => setShowStatusModal(true)}>
+            <ArrowRightLeft className="w-4 h-4" /> 变更状态
+          </button>
+        )}
+        {canAdopt && !isArchived && (
           <button className="btn-primary flex items-center gap-2" onClick={() => navigate(`/adoptions/apply/${id}`)}>
             <HeartHandshake className="w-4 h-4" /> 发起领养申请
           </button>
+        )}
+        {isArchived && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm">
+            <AlertCircle className="w-4 h-4" /> 档案已归档，不可修改
+          </div>
         )}
       </div>
 
@@ -217,7 +275,7 @@ export default function AnimalDetail() {
               <div>
                 <h4 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <PawPrint className="w-5 h-5 text-primary-500" /> 基本资料
-                  {!editMode && <button className="ml-auto text-sm text-primary-600 hover:underline" onClick={() => setEditMode(true)}>编辑资料</button>}
+                  {!editMode && !isArchived && <button className="ml-auto text-sm text-primary-600 hover:underline" onClick={() => setEditMode(true)}>编辑资料</button>}
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   {[
@@ -307,123 +365,113 @@ export default function AnimalDetail() {
           )}
 
           {tab === 'health' && (
-            <div className="space-y-8">
-              {/* Vaccines */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                    <Syringe className="w-5 h-5 text-primary-500" /> 疫苗接种记录
-                    <span className="text-xs text-gray-400 font-normal">({currentAnimal.vaccinations.length}条)</span>
-                  </h4>
-                  <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={() => setShowVaccineModal(true)}>
-                    <Plus className="w-4 h-4" /> 添加
-                  </button>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-primary-500" /> 健康事件时间线
+                    <span className="text-xs text-gray-400 font-normal">共 {allHealthEvents.length} 条记录</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">完整记录疫苗、驱虫、体检、手术等所有医疗健康事项</p>
                 </div>
-                {currentAnimal.vaccinations.length === 0 ? (
-                  <div className="p-8 bg-gray-50 rounded-xl text-center text-gray-500 text-sm">暂无疫苗记录</div>
-                ) : (
-                  <div className="overflow-hidden rounded-xl border border-gray-100">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50 text-gray-600">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-medium">疫苗名称</th>
-                          <th className="px-4 py-3 text-left font-medium">接种日期</th>
-                          <th className="px-4 py-3 text-left font-medium">下次接种</th>
-                          <th className="px-4 py-3 text-left font-medium">状态</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {currentAnimal.vaccinations.map((v, i) => {
-                          const isNext = new Date(v.nextDate) > new Date('2026-06-09');
-                          return (
-                            <tr key={i} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-medium">{v.name}</td>
-                              <td className="px-4 py-3 text-gray-600">{v.date}</td>
-                              <td className="px-4 py-3 text-gray-600">{v.nextDate || '-'}</td>
-                              <td className="px-4 py-3">
-                                {isNext ? (
-                                  <span className="status-badge bg-primary-100 text-primary-700">有效期内</span>
-                                ) : v.nextDate ? (
-                                  <span className="status-badge bg-warm-100 text-warm-700">待接种</span>
-                                ) : (
-                                  <span className="status-badge bg-gray-100 text-gray-600">无后续</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                {!isArchived && (
+                  <button className="btn-primary flex items-center gap-2" onClick={() => setShowHealthEventModal(true)}>
+                    <Plus className="w-4 h-4" /> 记录健康事件
+                  </button>
                 )}
               </div>
 
-              {/* Deworming */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                    <Pill className="w-5 h-5 text-blue-500" /> 驱虫记录
-                    <span className="text-xs text-gray-400 font-normal">({currentAnimal.dewormings.length}条)</span>
-                  </h4>
-                  <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={() => setShowDewormingModal(true)}>
-                    <Plus className="w-4 h-4" /> 添加
-                  </button>
-                </div>
-                {currentAnimal.dewormings.length === 0 ? (
-                  <div className="p-8 bg-gray-50 rounded-xl text-center text-gray-500 text-sm">暂无驱虫记录</div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    {currentAnimal.dewormings.map((d, i) => (
-                      <div key={i} className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{d.type}驱虫</div>
-                          <div className="text-xs text-gray-500 mt-1">执行日期：{d.date}</div>
-                        </div>
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Pill className="w-5 h-5 text-blue-600" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'all', label: '全部' },
+                  { key: 'vaccination', label: '疫苗', icon: Syringe },
+                  { key: 'deworming', label: '驱虫', icon: Pill },
+                  { key: 'checkup', label: '体检', icon: Stethoscope },
+                  { key: 'sterilization', label: '绝育', icon: Scissors },
+                  { key: 'surgery', label: '治疗', icon: Activity },
+                ].map(f => {
+                  const Icon = f.icon;
+                  const active = healthFilter === f.key;
+                  return (
+                    <button
+                      key={f.key}
+                      onClick={() => setHealthFilter(f.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        active ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {Icon && <Icon className="w-3.5 h-3.5" />}
+                      {f.label}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Treatments */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                    <Stethoscope className="w-5 h-5 text-red-500" /> 疾病治疗记录
-                    <span className="text-xs text-gray-400 font-normal">({currentAnimal.treatments.length}条)</span>
-                  </h4>
-                  <button className="btn-primary !py-1.5 !px-3 text-sm flex items-center gap-1" onClick={() => setShowTreatmentModal(true)}>
-                    <Plus className="w-4 h-4" /> 添加
-                  </button>
+              {allHealthEvents.length === 0 ? (
+                <div className="p-12 bg-gray-50 rounded-xl text-center">
+                  <Activity className="w-12 h-12 text-gray-300 mx-auto" />
+                  <div className="text-gray-500 mt-3">暂无健康事件记录</div>
+                  {!isArchived && <div className="text-xs text-gray-400 mt-1">点击右上角按钮开始记录</div>}
                 </div>
-                {currentAnimal.treatments.length === 0 ? (
-                  <div className="p-8 bg-gray-50 rounded-xl text-center text-gray-500 text-sm">暂无治疗记录</div>
-                ) : (
-                  <div className="space-y-3">
-                    {currentAnimal.treatments.map((t, i) => (
-                      <div key={i} className="p-4 bg-white rounded-xl border border-gray-100 hover:shadow-sm transition-shadow">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <Stethoscope className="w-5 h-5 text-red-500" />
-                              </div>
-                              <div>
-                                <div className="font-medium text-gray-800">{t.description}</div>
-                                <div className="text-xs text-gray-500 mt-0.5">{t.date}</div>
-                              </div>
-                            </div>
+              ) : (
+                <div className="space-y-3">
+                  {[...allHealthEvents].sort((a, b) => new Date(b.date) - new Date(a.date)).map((event) => {
+                    const cfg = healthEventConfig[event.type] || healthEventConfig.surgery;
+                    const Icon = cfg.icon;
+                    const colorMap = {
+                      primary: { bg: 'bg-primary-50', border: 'border-primary-100', text: 'text-primary-600', badge: 'bg-primary-100 text-primary-700' },
+                      blue: { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-600', badge: 'bg-blue-100 text-blue-700' },
+                      pink: { bg: 'bg-pink-50', border: 'border-pink-100', text: 'text-pink-600', badge: 'bg-pink-100 text-pink-700' },
+                      indigo: { bg: 'bg-indigo-50', border: 'border-indigo-100', text: 'text-indigo-600', badge: 'bg-indigo-100 text-indigo-700' },
+                      red: { bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-600', badge: 'bg-red-100 text-red-700' },
+                    };
+                    const cm = colorMap[cfg.color] || colorMap.primary;
+                    const today = new Date('2026-06-10');
+                    const isExpiring = event.nextDate && new Date(event.nextDate) <= new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000) && new Date(event.nextDate) >= today;
+                    const isExpired = event.nextDate && new Date(event.nextDate) < today;
+                    return (
+                      <div key={event.id} className={`${cm.bg} ${cm.border} border rounded-xl p-4 hover:shadow-sm transition-shadow`}>
+                        <div className="flex items-start gap-4">
+                          <div className={`w-10 h-10 ${cm.badge} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                            <Icon className={`w-5 h-5 ${cm.text}`} />
                           </div>
-                          <span className="status-badge bg-green-100 text-green-700">{t.result}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h5 className="font-semibold text-gray-800">{event.name}</h5>
+                              <span className={`status-badge ${cm.badge}`}>{cfg.label}</span>
+                              {isExpiring && event.nextDate && (
+                                <span className="status-badge bg-warm-100 text-warm-700 flex items-center gap-1">
+                                  <Clock className="w-3 h-3" /> 即将到期
+                                </span>
+                              )}
+                              {isExpired && event.nextDate && (
+                                <span className="status-badge bg-red-100 text-red-700 flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3" /> 已超期
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3.5 h-3.5" /> 发生日期：{event.date}
+                              </span>
+                              {event.nextDate && (
+                                <span className={`flex items-center gap-1 ${isExpired ? 'text-red-600 font-medium' : isExpiring ? 'text-warm-600 font-medium' : ''}`}>
+                                  <Clock className="w-3.5 h-3.5" /> 下次到期：{event.nextDate}
+                                </span>
+                              )}
+                            </div>
+                            {event.notes && (
+                              <div className="mt-2 text-sm text-gray-600 bg-white/50 rounded-lg p-2.5">
+                                {event.notes}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -566,6 +614,72 @@ export default function AnimalDetail() {
           <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
             <button className="btn-secondary" onClick={() => setShowTreatmentModal(false)}>取消</button>
             <button className="btn-primary flex items-center gap-1" onClick={handleSaveTreatment}><Save className="w-4 h-4" /> 保存</button>
+          </div>
+        </Modal>
+      )}
+
+      {showHealthEventModal && (
+        <Modal title="记录健康事件" onClose={() => setShowHealthEventModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="label-field">事件类型 <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(healthEventConfig).map(([key, cfg]) => {
+                  const Icon = cfg.icon;
+                  const selected = healthEventForm.type === key;
+                  return (
+                    <label key={key} className="cursor-pointer">
+                      <input type="radio" name="healthType" className="sr-only peer" checked={selected} onChange={() => {
+                        setHealthEventForm(p => ({ ...p, type: key }));
+                        if (key === 'sterilization') {
+                          setHealthEventForm(p => ({ ...p, name: '绝育手术', nextDate: '' }));
+                        } else if (key === 'checkup') {
+                          setHealthEventForm(p => ({ ...p, name: '年度体检' }));
+                        }
+                      }} />
+                      <div className={`p-3 rounded-xl border-2 text-center transition-colors flex items-center justify-center gap-2 ${
+                        selected ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                        <Icon className="w-4 h-4" />
+                        <span className="text-sm font-medium">{cfg.label}</span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label className="label-field">事件名称 <span className="text-red-500">*</span></label>
+              <input
+                className="input-field"
+                value={healthEventForm.name}
+                onChange={e => setHealthEventForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="如：狂犬疫苗、体内驱虫、年度体检..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label-field">发生日期 <span className="text-red-500">*</span></label>
+                <input type="date" className="input-field" value={healthEventForm.date} onChange={e => setHealthEventForm(p => ({ ...p, date: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label-field">下次到期日期</label>
+                <input type="date" className="input-field" value={healthEventForm.nextDate} onChange={e => setHealthEventForm(p => ({ ...p, nextDate: e.target.value }))} placeholder="如为周期性事项请填写" />
+              </div>
+            </div>
+            <div>
+              <label className="label-field">备注说明</label>
+              <textarea
+                className="input-field min-h-[80px]"
+                value={healthEventForm.notes}
+                onChange={e => setHealthEventForm(p => ({ ...p, notes: e.target.value }))}
+                placeholder="记录详情，如：具体项目、结果、注意事项等..."
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
+            <button className="btn-secondary" onClick={() => setShowHealthEventModal(false)}>取消</button>
+            <button className="btn-primary flex items-center gap-1" onClick={handleSaveHealthEvent}><Save className="w-4 h-4" /> 保存记录</button>
           </div>
         </Modal>
       )}

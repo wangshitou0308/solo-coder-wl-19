@@ -72,7 +72,10 @@ export default function AdoptionDetail() {
 
   const currentStepIdx = reviewSteps.findIndex(s => s.key === reviewStep);
 
+  const isRejected = adoption.status === 'rejected';
+
   const handleSavePhone = () => {
+    if (isRejected) { alert('该申请已被拒绝，无法继续审核'); return; }
     if (!phoneForm.date || !phoneForm.notes) { alert('请填写日期和回访记录'); return; }
     dispatch({ type: 'UPDATE_ADOPTION', payload: { id, data: { phoneInterviewDate: phoneForm.date, phoneInterviewNotes: phoneForm.notes } } });
     dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'adoption', message: `领养${id}电话回访已完成` } });
@@ -81,6 +84,7 @@ export default function AdoptionDetail() {
   };
 
   const handleSaveVisit = () => {
+    if (isRejected) { alert('该申请已被拒绝，无法继续审核'); return; }
     if (!visitForm.date || visitForm.pass === null || !visitForm.notes) { alert('请填写完整信息'); return; }
     dispatch({ type: 'UPDATE_ADOPTION', payload: { id, data: { homeVisitDate: visitForm.date, homeVisitPass: visitForm.pass, homeVisitNotes: visitForm.notes } } });
     if (!visitForm.pass) {
@@ -95,6 +99,7 @@ export default function AdoptionDetail() {
   };
 
   const handleSaveMeet = () => {
+    if (isRejected) { alert('该申请已被拒绝，无法继续审核'); return; }
     if (!meetDate) { alert('请选择见面日期'); return; }
     dispatch({ type: 'UPDATE_ADOPTION', payload: { id, data: { meetDate } } });
     alert('见面日期已确认');
@@ -102,6 +107,7 @@ export default function AdoptionDetail() {
   };
 
   const handleSignAndAdopt = () => {
+    if (isRejected) { alert('该申请已被拒绝，无法继续审核'); return; }
     if (!signDate) { alert('请选择签约日期'); return; }
     if (!confirm('确认完成签约并支付押金？此操作将：\n1. 将动物状态变更为回访期\n2. 自动生成5个回访任务\n3. 记录押金支付完成')) return;
     dispatch({ type: 'APPROVE_ADOPTION_AND_SIGN', payload: { adoptionId: id, signedDate: signDate } });
@@ -184,6 +190,16 @@ export default function AdoptionDetail() {
           </p>
         </div>
       </div>
+
+      {isRejected && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-red-800 flex-1">
+            <div className="font-semibold mb-0.5">该领养申请已被拒绝</div>
+            <div>申请流程已终止，无法继续进行家访、签约等后续操作。如需重新申请，请联系救助站工作人员。</div>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">

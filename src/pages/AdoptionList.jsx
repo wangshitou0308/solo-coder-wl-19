@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export default function AdoptionList() {
-  const { state } = useApp();
+  const { state, filtered: roleFiltered } = useApp();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -31,8 +31,10 @@ export default function AdoptionList() {
     return map[s] || { label: s, color: 'bg-gray-100 text-gray-700', icon: Clock };
   };
 
+  const visibleAdoptions = roleFiltered.adoptions;
+
   const filtered = useMemo(() => {
-    return state.adoptions.filter(a => {
+    return visibleAdoptions.filter(a => {
       if (statusFilter !== 'all' && a.status !== statusFilter) return false;
       if (search) {
         const s = search.toLowerCase();
@@ -44,17 +46,17 @@ export default function AdoptionList() {
       }
       return true;
     });
-  }, [state.adoptions, search, statusFilter]);
+  }, [visibleAdoptions, search, statusFilter]);
 
-  const pendingFollowupAudits = state.adoptions.reduce((acc, a) =>
+  const pendingFollowupAudits = visibleAdoptions.reduce((acc, a) =>
     acc + a.followups.filter(f => f.status === 'completed' && f.auditStatus === 'pending').length, 0);
-  const overdueFollowups = state.adoptions.reduce((acc, a) =>
+  const overdueFollowups = visibleAdoptions.reduce((acc, a) =>
     acc + a.followups.filter(f => f.status === 'overdue').length, 0);
 
   const stats = {
-    total: state.adoptions.length,
-    reviewing: state.adoptions.filter(a => a.status === 'reviewing').length,
-    completed: state.adoptions.filter(a => a.status === 'completed').length,
+    total: visibleAdoptions.length,
+    reviewing: visibleAdoptions.filter(a => a.status === 'reviewing').length,
+    completed: visibleAdoptions.filter(a => a.status === 'completed').length,
   };
 
   return (

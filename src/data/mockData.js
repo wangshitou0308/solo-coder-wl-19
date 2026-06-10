@@ -44,6 +44,14 @@ export const initialAnimals = [
     treatments: [
       { date: '2026-01-16', description: '体表外伤清创处理', result: '已愈合' },
     ],
+    healthEvents: [
+      { id: 'H001', type: 'vaccination', name: '狂犬疫苗', date: '2026-01-20', nextDate: '2027-01-20', notes: '常规年度接种' },
+      { id: 'H002', type: 'vaccination', name: '六联疫苗', date: '2026-01-20', nextDate: '2027-01-20', notes: '常规年度接种' },
+      { id: 'H003', type: 'deworming', name: '体内驱虫', date: '2026-01-20', nextDate: '2026-07-20', notes: '' },
+      { id: 'H004', type: 'deworming', name: '体外驱虫', date: '2026-01-20', nextDate: '2026-07-20', notes: '' },
+      { id: 'H005', type: 'sterilization', name: '绝育手术', date: '2026-02-10', nextDate: null, notes: '手术顺利，恢复良好' },
+      { id: 'H006', type: 'checkup', name: '年度体检', date: '2026-01-20', nextDate: '2027-01-20', notes: '血常规、生化、便检均正常' },
+    ],
     healthRecord: '整体健康状况良好，血液检查正常',
   },
   {
@@ -474,6 +482,7 @@ export const initialTasks = [
     status: 'claimed',
     claimantId: 'V001',
     stationId: 'S001',
+    clueId: 'C001',
   },
   {
     id: 'T002',
@@ -606,5 +615,29 @@ export const volunteerDirections = [
   { key: 'review', label: '审核', icon: 'FileCheck' },
   { key: 'copywriting', label: '文案', icon: 'PenLine' },
 ];
+
+export const healthEventTypes = [
+  { key: 'vaccination', label: '疫苗接种', icon: 'Syringe', color: 'primary' },
+  { key: 'deworming', label: '驱虫', icon: 'Pill', color: 'blue' },
+  { key: 'sterilization', label: '绝育手术', icon: 'Scissors', color: 'pink' },
+  { key: 'checkup', label: '体检', icon: 'Stethoscope', color: 'indigo' },
+  { key: 'surgery', label: '其他手术/治疗', icon: 'Activity', color: 'red' },
+];
+
+export const userRoles = [
+  { key: 'admin', label: '系统管理员', desc: '全局数据可见，拥有所有操作权限' },
+  { key: 'staff', label: '救助站工作人员', desc: '仅可操作查看所属站点数据' },
+  { key: 'volunteer', label: '志愿者', desc: '仅可见任务列表与个人参与记录' },
+  { key: 'adopter', label: '领养人', desc: '仅可查看自身领养申请与回访进度' },
+];
+
+export const defaultUser = {
+  id: 'U001',
+  name: '系统管理员',
+  role: 'admin',
+  stationId: null,
+  avatar: null,
+  email: 'admin@petsrescue.org',
+};
 
 export const followupSchedule = [7, 30, 90, 180, 365];

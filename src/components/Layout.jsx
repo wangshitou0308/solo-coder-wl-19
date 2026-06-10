@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -16,42 +16,54 @@ import {
   AlertCircle,
   FileText,
   Truck,
+  Shield,
+  UserCog,
+  Heart,
+  UserCheck,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
+import { userRoles } from '../data/mockData';
 
-const navItems = [
-  { path: '/dashboard', label: '数据仪表盘', icon: LayoutDashboard },
+const allNavItems = [
+  { path: '/dashboard', label: '数据仪表盘', icon: LayoutDashboard, roles: ['admin', 'staff'] },
   {
-    path: '/clues', label: '救助线索', icon: MapPin, badge: true,
+    path: '/clues', label: '救助线索', icon: MapPin, badge: true, roles: ['admin', 'staff'],
     children: [
       { path: '/clues', label: '线索列表' },
       { path: '/clues/submit', label: '提交线索' },
     ]
   },
   {
-    path: '/animals', label: '动物档案', icon: PawPrint,
+    path: '/animals', label: '动物档案', icon: PawPrint, roles: ['admin', 'staff'],
     children: [
       { path: '/animals', label: '档案列表' },
       { path: '/animals/new', label: '新建档案' },
     ]
   },
   {
-    path: '/adoptions', label: '领养管理', icon: HeartHandshake, badge: true,
+    path: '/adoptions', label: '领养管理', icon: HeartHandshake, badge: true, roles: ['admin', 'staff', 'adopter'],
     children: [
       { path: '/adoptions', label: '申请列表' },
     ]
   },
   {
-    path: '/volunteers', label: '志愿者', icon: Users,
+    path: '/volunteers', label: '志愿者', icon: Users, roles: ['admin', 'staff'],
     children: [
       { path: '/volunteers', label: '志愿者列表' },
       { path: '/volunteers/register', label: '注册申请' },
     ]
   },
-  { path: '/tasks', label: '任务中心', icon: ClipboardList },
-  { path: '/donations', label: '捐赠管理', icon: Gift },
-  { path: '/stations', label: '救助站管理', icon: Building2 },
+  { path: '/tasks', label: '任务中心', icon: ClipboardList, roles: ['admin', 'staff', 'volunteer'] },
+  { path: '/donations', label: '捐赠管理', icon: Gift, roles: ['admin', 'staff'] },
+  { path: '/stations', label: '救助站管理', icon: Building2, roles: ['admin'] },
 ];
+
+const roleIconMap = {
+  admin: Shield,
+  staff: UserCog,
+  volunteer: Heart,
+  adopter: UserCheck,
+};
 
 export default function Layout() {
   const { state, dispatch } = useApp();
@@ -61,11 +73,19 @@ export default function Layout() {
   const [expandedMenu, setExpandedMenu] = useState({});
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+
+  const user = state.currentUser;
+  const RoleIcon = roleIconMap[user.role] || Shield;
+
+  const navItems = useMemo(() => allNavItems.filter(item => item.roles.includes(user.role)), [user.role]);
 
   const unreadClues = state.clues.filter(c => c.status === 'pending').length;
   const pendingAdoptions = state.adoptions.filter(a => a.status === 'reviewing').length;
   const overdueFollowups = state.adoptions.reduce((acc, a) =>
     acc + a.followups.filter(f => f.status === 'overdue').length, 0);
+
+  const currentRoleInfo = userRoles.find(r => r.key === user.role);
 
   const toggleMenu = (path) => {
     setExpandedMenu(prev => ({ ...prev, [path]: !prev[path] }));
@@ -152,7 +172,50 @@ export default function Layout() {
           })}
         </nav>
 
-        <div className="p-3 border-t border-gray-100">
+        <div className="p-3 border-t border-gray-100 space-y-2">
+          {sidebarOpen && (
+            <div className="relative">
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+              >
+                <RoleIcon className="w-4 h-4 text-primary-600" />
+                <div className="flex-1 text-left min-w-0">
+                  <div className="text-xs text-gray-500">当前视图</div>
+                  <div className="text-sm font-medium truncate">{currentRoleInfo?.label || '未知角色'}</div>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${roleMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {roleMenuOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-gray-50 text-xs text-gray-500">切换角色视图</div>
+                  {userRoles.map((role) => {
+                    const RIcon = roleIconMap[role.key] || Shield;
+                    const active = user.role === role.key;
+                    return (
+                      <button
+                        key={role.key}
+                        className={`w-full px-3 py-2.5 text-left hover:bg-gray-50 flex items-start gap-2 transition-colors ${active ? 'bg-primary-50' : ''}`}
+                        onClick={() => {
+                          dispatch({ type: 'SET_USER_ROLE', payload: { role: role.key } });
+                          setRoleMenuOpen(false);
+                          const defaultPath = role.key === 'adopter' ? '/adoptions' : role.key === 'volunteer' ? '/tasks' : '/dashboard';
+                          navigate(defaultPath);
+                        }}
+                      >
+                        <RIcon className={`w-4 h-4 mt-0.5 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-medium ${active ? 'text-primary-700' : 'text-gray-800'}`}>{role.label}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{role.desc}</div>
+                        </div>
+                        {active && <div className="w-2 h-2 rounded-full bg-primary-500 mt-1.5 flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           <button
             className="w-full flex items-center justify-center py-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -224,19 +287,68 @@ export default function Layout() {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
               >
                 <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                  管
+                  {user.name?.charAt(0) || '用'}
                 </div>
                 <div className="text-left">
-                  <div className="text-sm font-medium">{state.currentUser.name}</div>
-                  <div className="text-xs text-gray-500">系统管理员</div>
+                  <div className="text-sm font-medium">{user.name}</div>
+                  <div className="text-xs text-gray-500 flex items-center gap-1">
+                    <RoleIcon className="w-3 h-3" />
+                    {currentRoleInfo?.label || '未知角色'}
+                    {user.role === 'staff' && user.stationId && (
+                      <span className="text-gray-400">· {state.stations.find(s => s.id === user.stationId)?.name}</span>
+                    )}
+                  </div>
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
               {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
-                  <button className="w-full px-4 py-3 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> 个人资料
-                  </button>
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
+                  <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-blue-50 border-b border-gray-100">
+                    <div className="font-medium text-gray-800">{user.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                      <RoleIcon className="w-3 h-3" /> {currentRoleInfo?.label}
+                    </div>
+                    {user.role === 'staff' && user.stationId && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        所属站点：{state.stations.find(s => s.id === user.stationId)?.name}
+                      </div>
+                    )}
+                  </div>
+                  {user.role === 'staff' && (
+                    <div className="px-4 py-3 border-b border-gray-50">
+                      <label className="text-xs text-gray-500 block mb-1.5">切换所属站点</label>
+                      <select
+                        className="input-field !py-1.5 text-sm"
+                        value={user.stationId || ''}
+                        onChange={(e) => dispatch({ type: 'SET_USER_STATION', payload: { stationId: e.target.value } })}
+                      >
+                        {state.stations.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-50">快速切换角色视图</div>
+                  {userRoles.map((role) => {
+                    const RIcon = roleIconMap[role.key] || Shield;
+                    const active = user.role === role.key;
+                    return (
+                      <button
+                        key={role.key}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 transition-colors ${active ? 'bg-primary-50' : ''}`}
+                        onClick={() => {
+                          dispatch({ type: 'SET_USER_ROLE', payload: { role: role.key } });
+                          setUserMenuOpen(false);
+                          const defaultPath = role.key === 'adopter' ? '/adoptions' : role.key === 'volunteer' ? '/tasks' : '/dashboard';
+                          navigate(defaultPath);
+                        }}
+                      >
+                        <RIcon className={`w-4 h-4 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
+                        <span className={active ? 'text-primary-700 font-medium' : 'text-gray-700'}>{role.label}</span>
+                        {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-500" />}
+                      </button>
+                    );
+                  })}
                   <button className="w-full px-4 py-3 text-left text-sm hover:bg-gray-50 flex items-center gap-2 border-t border-gray-50 text-red-600">
                     <X className="w-4 h-4" /> 退出登录
                   </button>
@@ -253,12 +365,13 @@ export default function Layout() {
       </div>
 
       {/* Outside Click */}
-      {(notifOpen || userMenuOpen) && (
+      {(notifOpen || userMenuOpen || roleMenuOpen) && (
         <div
           className="fixed inset-0 z-40"
           onClick={() => {
             setNotifOpen(false);
             setUserMenuOpen(false);
+            setRoleMenuOpen(false);
           }}
         />
       )}
