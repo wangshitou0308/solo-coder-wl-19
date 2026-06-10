@@ -142,14 +142,15 @@ export default function AnimalDetail() {
     surgery: { label: '手术/治疗', icon: Activity, color: 'red' },
   };
 
+  const currentAnimal = state.animals.find(a => a.id === id);
+  const display = editMode ? form : currentAnimal;
+
   const allHealthEvents = useMemo(() => {
+    if (!currentAnimal) return [];
     const events = currentAnimal.healthEvents || [];
     if (healthFilter === 'all') return events;
     return events.filter(e => e.type === healthFilter);
-  }, [currentAnimal.healthEvents, healthFilter]);
-
-  const currentAnimal = state.animals.find(a => a.id === id);
-  const display = editMode ? form : currentAnimal;
+  }, [currentAnimal, healthFilter]);
 
   return (
     <div className="space-y-6">

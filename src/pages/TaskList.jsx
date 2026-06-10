@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import {
   ClipboardList,
@@ -31,6 +32,7 @@ const taskTypeConfig = {
 
 export default function TaskList() {
   const { state, dispatch, filtered: roleFiltered } = useApp();
+  const navigate = useNavigate();
   const user = state.currentUser;
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');

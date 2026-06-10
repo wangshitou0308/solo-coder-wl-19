@@ -92,11 +92,16 @@ function reducer(state, action) {
     }
 
     case 'UPDATE_CLUE_STATUS': {
-      const { clueId, status, animalId } = action.payload;
+      const { clueId, status, animalId, assignedStationId } = action.payload;
       return {
         ...state,
         clues: state.clues.map(c =>
-          c.id === clueId ? { ...c, status, animalId: animalId || c.animalId } : c
+          c.id === clueId ? {
+            ...c,
+            status: status || c.status,
+            animalId: animalId || c.animalId,
+            assignedStationId: assignedStationId !== undefined ? assignedStationId : c.assignedStationId,
+          } : c
         ),
       };
     }
